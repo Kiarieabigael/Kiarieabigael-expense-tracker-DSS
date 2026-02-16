@@ -1,5 +1,5 @@
 {
-  "name": "Settle - Mindful Expense Tracker",
-  "description": "A private, minimal personal expense tracker focused on financial clarity and peace of mind. All data stays local to your browser.",
+  "name": "Settle - Personal DSS Tracker",
+  "description": "A private, Kenyan-localized financial Decision Support System (DSS) focused on income analysis, mindful spending, and intelligent investment advisory.",
   "requestFramePermissions": []
 }

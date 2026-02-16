@@ -1,16 +1,17 @@
 
 import React, { useMemo } from 'react';
-import { TrendingUp, CreditCard, Wallet, AlertCircle, ArrowRight } from 'lucide-react';
-import { Expense, AppSettings, Category } from '../types';
+import { TrendingUp, CreditCard, Wallet, AlertCircle, ArrowRight, ArrowUpCircle } from 'lucide-react';
+import { Expense, Income, AppSettings, Category } from '../types';
 import { CATEGORY_COLORS } from '../constants';
 import { Link } from 'react-router-dom';
 
 interface DashboardProps {
   expenses: Expense[];
+  incomes: Income[];
   settings: AppSettings;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ expenses, settings }) => {
+const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, settings }) => {
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
 
@@ -21,11 +22,22 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, settings }) => {
     });
   }, [expenses, currentMonth, currentYear]);
 
+  const currentMonthIncomes = useMemo(() => {
+    return incomes.filter(i => {
+      const d = new Date(i.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+  }, [incomes, currentMonth, currentYear]);
+
   const totalSpent = useMemo(() => {
     return currentMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
   }, [currentMonthExpenses]);
 
-  const remainingBudget = settings.monthlyBudget - totalSpent;
+  const totalIncome = useMemo(() => {
+    return currentMonthIncomes.reduce((sum, i) => sum + i.amount, 0);
+  }, [currentMonthIncomes]);
+
+  const surplus = totalIncome - totalSpent;
   const budgetPercentage = Math.min((totalSpent / settings.monthlyBudget) * 100, 100);
 
   const topCategories = useMemo(() => {
@@ -40,25 +52,33 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, settings }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <header>
-        <h2 className="text-3xl font-semibold text-slate-900 tracking-tight">Overview</h2>
-        <p className="text-slate-500 mt-1">Peace of mind starts with awareness.</p>
+      <header className="flex justify-between items-start">
+        <div>
+          <h2 className="text-3xl font-semibold text-slate-900 tracking-tight">Overview</h2>
+          <p className="text-slate-500 mt-1">Peace of mind starts with awareness.</p>
+        </div>
       </header>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <SummaryCard 
-          title="Spent this month" 
-          value={`${settings.currency}${totalSpent.toLocaleString()}`} 
-          icon={<CreditCard className="text-indigo-500" />}
+          title="Income" 
+          value={`${settings.currency}${totalIncome.toLocaleString()}`} 
+          icon={<ArrowUpCircle className="text-emerald-500" />}
           color="bg-white"
         />
         <SummaryCard 
-          title="Remaining Budget" 
-          value={`${settings.currency}${Math.max(0, remainingBudget).toLocaleString()}`} 
-          icon={<Wallet className="text-emerald-500" />}
+          title="Expenses" 
+          value={`${settings.currency}${totalSpent.toLocaleString()}`} 
+          icon={<CreditCard className="text-rose-500" />}
           color="bg-white"
-          subtitle={remainingBudget < 0 ? "Exceeded budget" : ""}
+        />
+        <SummaryCard 
+          title="Surplus" 
+          value={`${settings.currency}${surplus.toLocaleString()}`} 
+          icon={<Wallet className={surplus >= 0 ? "text-indigo-500" : "text-rose-600"} />}
+          color="bg-white"
+          subtitle={surplus < 0 ? "Deficit detected" : "Ready to save"}
         />
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-start">
@@ -79,13 +99,16 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, settings }) => {
         </div>
       </div>
 
-      {/* Warning if overspending */}
-      {totalSpent > settings.monthlyBudget && (
-        <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-3 text-rose-800">
-          <AlertCircle size={20} className="flex-shrink-0" />
-          <p className="text-sm">You have exceeded your monthly budget by {settings.currency}{(totalSpent - settings.monthlyBudget).toLocaleString()}. Consider reviewing your non-essential spending.</p>
+      {/* Analysis Banner */}
+      <div className="bg-indigo-600 rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-100">
+        <div className="space-y-1">
+          <h3 className="text-xl font-bold">Your Financial DSS is ready.</h3>
+          <p className="text-indigo-100 text-sm">Based on your {settings.currency} {surplus.toLocaleString()} surplus, we have investment advice for you.</p>
         </div>
-      )}
+        <Link to="/budget" className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors shadow-lg">
+          View Advisory
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Top Categories */}
@@ -166,7 +189,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({ title, value, icon, color, su
       <div className="p-2 bg-slate-50 rounded-lg">{icon}</div>
     </div>
     <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
-    {subtitle && <p className="text-[10px] text-rose-500 font-medium mt-1 uppercase tracking-wider">{subtitle}</p>}
+    {subtitle && <p className={`text-[10px] font-bold mt-1 uppercase tracking-wider ${subtitle.includes('Deficit') ? 'text-rose-500' : 'text-emerald-500'}`}>{subtitle}</p>}
   </div>
 );
 

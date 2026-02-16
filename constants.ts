@@ -1,4 +1,5 @@
-import { Category } from './types';
+
+import { Category, IncomeCategory, IncomeFrequency } from './types';
 
 export const CATEGORIES: Category[] = [
   'Food & Dining',
@@ -10,6 +11,22 @@ export const CATEGORIES: Category[] = [
   'Education',
   'Bills',
   'Others'
+];
+
+export const INCOME_CATEGORIES: IncomeCategory[] = [
+  'Salary',
+  'Business',
+  'Side Hustle',
+  'Investment Return',
+  'Gift',
+  'Others'
+];
+
+export const INCOME_FREQUENCIES: IncomeFrequency[] = [
+  'Weekly',
+  'Bi-weekly',
+  'Monthly',
+  'One-time'
 ];
 
 export const CATEGORY_COLORS: Record<Category, string> = {

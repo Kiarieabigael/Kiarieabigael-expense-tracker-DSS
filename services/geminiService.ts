@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { Category, Expense } from "../types";
+import { Category, Expense, Income, InvestmentAdvice, FinancialHealth, FinancialReport } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -33,45 +33,158 @@ export async function suggestCategory(description: string): Promise<Category> {
 }
 
 /**
- * Generates supportive financial insights based on expense history.
+ * Generates a comprehensive financial report for a month or a year.
  */
-export async function generateSpendingInsights(expenses: Expense[], monthlyBudget: number): Promise<string[]> {
-  if (expenses.length < 3) return ["Add a few more expenses to see personalized insights."];
+export async function generateFinancialReport(
+  period: string,
+  expenses: Expense[],
+  incomes: Income[],
+  currency: string
+): Promise<FinancialReport> {
+  const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const surplus = totalIncome - totalExpenses;
+  
+  const categories: Record<string, number> = {};
+  expenses.forEach(e => {
+    categories[e.category] = (categories[e.category] || 0) + e.amount;
+  });
 
-  const recentExpenses = expenses.slice(0, 20).map(e => ({
-    amount: e.amount,
-    category: e.category,
-    desc: e.description,
-    date: e.date
-  }));
+  const sortedCategories = Object.entries(categories)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([category, amount]) => ({ category: category as Category, amount }));
 
   const prompt = `
-    Analyze these recent expenses and the monthly budget of ${monthlyBudget}. 
-    Provide 2-3 short, supportive, and non-judgmental spending insights or patterns. 
-    Focus on helpful observations like "Most of your spending happens on weekends" or "You're doing great keeping your dining out costs down."
+    You are a Kenyan financial advisor assistant. Create a ${period} financial report based on:
+    - Total Income: ${currency} ${totalIncome}
+    - Total Expenses: ${currency} ${totalExpenses}
+    - Top Spending: ${JSON.stringify(sortedCategories)}
+    - Income Sources: ${JSON.stringify(incomes.map(i => ({ src: i.description, freq: i.frequency })))}
     
-    Data: ${JSON.stringify(recentExpenses)}
+    Structure your response as follows:
+    1. A short, supportive, non-judgmental summary (max 3 sentences).
+    2. Future-looking financial advice considering localized Kenyan investment options (MMFs, SACCOs, NSE).
+    3. Emphasize emergency fund progress.
     
-    Output format: A JSON array of strings.
+    Output in strict JSON format:
+    {
+      "summary": "string",
+      "aiAdvice": "string"
+    }
   `;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+
+    const aiResult = JSON.parse(response.text || '{}');
+    
+    return {
+      period,
+      summary: aiResult.summary || "A solid overview of your financial activity.",
+      metrics: {
+        totalIncome,
+        totalExpenses,
+        savings: Math.max(0, surplus * 0.5), // Simulated distribution
+        investments: Math.max(0, surplus * 0.5),
+        surplus
+      },
+      topCategories: sortedCategories,
+      aiAdvice: aiResult.aiAdvice || "Continue tracking to see deeper trends."
+    };
+  } catch (error) {
+    console.error("Report generation failed", error);
+    return {
+      period,
+      summary: "Your financial report is ready. You have managed your cashflow through the period.",
+      metrics: { totalIncome, totalExpenses, savings: 0, investments: 0, surplus },
+      topCategories: sortedCategories,
+      aiAdvice: "Consider setting aside 20% of your surplus into a Money Market Fund for liquidity."
+    };
+  }
+}
+
+/**
+ * Generates Kenyan-specific investment advice based on financial standing.
+ */
+export async function generateInvestmentDSS(
+  totalIncome: number, 
+  totalExpenses: number, 
+  currency: string
+): Promise<{ health: FinancialHealth, investments: InvestmentAdvice[] }> {
+  const surplus = totalIncome - totalExpenses;
+  
+  const prompt = `
+    You are a Kenyan financial advisor. Analyze this data:
+    - Monthly Income: ${currency} ${totalIncome}
+    - Monthly Expenses: ${currency} ${totalExpenses}
+    - Monthly Surplus: ${currency} ${surplus}
+    
+    Provide:
+    1. Financial health summary (surplus, savings rate, emergency fund status). Emergency fund target is 3x monthly expenses.
+    2. 3 Specific investment options available in Kenya (MMF, SACCO, M-Akiba, NSE, etc.) categorized by Risk (Low, Medium, High).
+    3. High-risk options must include clear warnings.
+    
+    Output in strict JSON format matching:
+    {
+      "health": {
+        "surplus": number,
+        "savingsRate": number,
+        "emergencyFundStatus": "Critical" | "Building" | "Secure",
+        "recommendation": "string"
+      },
+      "investments": [
+        { "level": "Low" | "Medium" | "High", "option": "string", "description": "string", "riskWarning": "string" }
+      ]
+    }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
       config: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
       }
     });
 
-    const insights = JSON.parse(response.text || '[]');
-    return insights;
+    return JSON.parse(response.text || '{}');
   } catch (error) {
-    console.error("Gemini insights generation failed", error);
+    console.error("Gemini DSS failed", error);
+    return {
+      health: {
+        surplus,
+        savingsRate: totalIncome > 0 ? (surplus / totalIncome) * 100 : 0,
+        emergencyFundStatus: surplus > 0 ? 'Building' : 'Critical',
+        recommendation: "Focus on building an emergency fund covering 3 months of expenses."
+      },
+      investments: [
+        { level: 'Low', option: 'Money Market Fund (MMF)', description: 'Low-risk, flexible interest-earning account like CIC or Zimele.' }
+      ]
+    };
+  }
+}
+
+/**
+ * Generates supportive financial insights based on expense history.
+ */
+export async function generateSpendingInsights(expenses: Expense[], monthlyBudget: number): Promise<string[]> {
+  if (expenses.length < 3) return ["Add a few more expenses to see personalized insights."];
+  const recentExpenses = expenses.slice(0, 20).map(e => ({ amount: e.amount, category: e.category, desc: e.description, date: e.date }));
+  const prompt = `Analyze these expenses and the budget of ${monthlyBudget}. Provide 2-3 short, supportive, non-judgmental insights. Output: JSON array of strings. Data: ${JSON.stringify(recentExpenses)}`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+    return JSON.parse(response.text || '[]');
+  } catch (error) {
     return ["Your spending patterns look consistent this month."];
   }
 }

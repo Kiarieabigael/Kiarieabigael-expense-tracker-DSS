@@ -6,6 +6,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
  * Suggests a category based on the expense description.
+ * This is the only function that sends raw text, and only for the specific active entry.
  */
 export async function suggestCategory(description: string): Promise<Category> {
   try {
@@ -34,6 +35,7 @@ export async function suggestCategory(description: string): Promise<Category> {
 
 /**
  * Generates a comprehensive financial report for a month or a year.
+ * DESCRIPTION STRIPPING: Only categories and frequencies are sent.
  */
 export async function generateFinancialReport(
   period: string,
@@ -55,12 +57,15 @@ export async function generateFinancialReport(
     .slice(0, 3)
     .map(([category, amount]) => ({ category: category as Category, amount }));
 
+  // PRIVACY: We map income category instead of description
+  const incomeSummary = incomes.map(i => ({ cat: i.category, freq: i.frequency, amt: i.amount }));
+
   const prompt = `
     You are a Kenyan financial advisor assistant. Create a ${period} financial report based on:
     - Total Income: ${currency} ${totalIncome}
     - Total Expenses: ${currency} ${totalExpenses}
-    - Top Spending: ${JSON.stringify(sortedCategories)}
-    - Income Sources: ${JSON.stringify(incomes.map(i => ({ src: i.description, freq: i.frequency })))}
+    - Top Spending Categories: ${JSON.stringify(sortedCategories)}
+    - Income Sources (Categorized): ${JSON.stringify(incomeSummary)}
     
     Structure your response as follows:
     1. A short, supportive, non-judgmental summary (max 3 sentences).
@@ -110,6 +115,7 @@ export async function generateFinancialReport(
 
 /**
  * Generates Kenyan-specific investment advice based on financial standing.
+ * Uses only aggregate totals.
  */
 export async function generateInvestmentDSS(
   totalIncome: number, 
@@ -119,10 +125,10 @@ export async function generateInvestmentDSS(
   const surplus = totalIncome - totalExpenses;
   
   const prompt = `
-    You are a Kenyan financial advisor. Analyze this data:
-    - Monthly Income: ${currency} ${totalIncome}
-    - Monthly Expenses: ${currency} ${totalExpenses}
-    - Monthly Surplus: ${currency} ${surplus}
+    You are a Kenyan financial advisor. Analyze this aggregate data:
+    - Monthly Income Total: ${currency} ${totalIncome}
+    - Monthly Expenses Total: ${currency} ${totalExpenses}
+    - Monthly Surplus Total: ${currency} ${surplus}
     
     Provide:
     1. Financial health summary (surplus, savings rate, emergency fund status). Emergency fund target is 3x monthly expenses.
@@ -171,11 +177,19 @@ export async function generateInvestmentDSS(
 
 /**
  * Generates supportive financial insights based on expense history.
+ * PRIVACY: Descriptions stripped.
  */
 export async function generateSpendingInsights(expenses: Expense[], monthlyBudget: number): Promise<string[]> {
   if (expenses.length < 3) return ["Add a few more expenses to see personalized insights."];
-  const recentExpenses = expenses.slice(0, 20).map(e => ({ amount: e.amount, category: e.category, desc: e.description, date: e.date }));
-  const prompt = `Analyze these expenses and the budget of ${monthlyBudget}. Provide 2-3 short, supportive, non-judgmental insights. Output: JSON array of strings. Data: ${JSON.stringify(recentExpenses)}`;
+  
+  // PRIVACY: Stripping raw descriptions (desc) from the payload
+  const recentExpenses = expenses.slice(0, 20).map(e => ({ 
+    amount: e.amount, 
+    category: e.category, 
+    date: e.date 
+  }));
+  
+  const prompt = `Analyze these categorized spending patterns (descriptions stripped for privacy) and the budget of ${monthlyBudget}. Provide 2-3 short, supportive, non-judgmental insights. Output: JSON array of strings. Data: ${JSON.stringify(recentExpenses)}`;
 
   try {
     const response = await ai.models.generateContent({

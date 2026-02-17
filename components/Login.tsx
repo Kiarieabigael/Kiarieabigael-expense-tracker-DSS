@@ -6,7 +6,6 @@ import {
   Lock, 
   LogIn, 
   ChevronRight, 
-  Globe, 
   Fingerprint, 
   ArrowLeft,
   CheckCircle2,
@@ -25,7 +24,7 @@ import {
 } from '../utils/auth';
 
 interface LoginProps {
-  onLogin: (user: { id: string; email: string }, provider: 'local' | 'google') => void;
+  onLogin: (user: { id: string; email: string }, provider: 'local') => void;
 }
 
 type AuthView = 'LOGIN' | 'SIGNUP' | 'FORGOT' | 'RESET_SENT';
@@ -59,18 +58,20 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setLoading(true);
     setError(null);
 
-    const hash = await hashPassword(password);
-    const user = verifyCredentials(email, hash);
-
-    setTimeout(() => {
+    try {
+      const user = await verifyCredentials(email, password);
       if (user) {
         onLogin({ id: user.id, email: user.email }, 'local');
       } else {
         setError("We couldn’t sign you in. Please check your details.");
         triggerShake();
       }
+    } catch (e) {
+      setError("An error occurred during sign-in.");
+      triggerShake();
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -99,19 +100,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       return;
     }
 
-    const hash = await hashPassword(password);
-    if (!isPasswordHashUnique(hash)) {
-      setError("This password is already in use. Please choose a different one.");
-      triggerShake();
-      setLoading(false);
-      return;
-    }
-
-    setTimeout(() => {
-      const userId = registerUserLocally(email, hash);
+    try {
+      const saltHash = await hashPassword(password);
+      const userId = registerUserLocally(email, saltHash);
       onLogin({ id: userId, email }, 'local');
+    } catch (e) {
+      setError("Account initialization failed.");
+      triggerShake();
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const handleForgot = (e: React.FormEvent) => {
@@ -126,14 +124,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setLoading(false);
       setView('RESET_SENT');
     }, 1200);
-  };
-
-  const handleGoogleLogin = () => {
-    setLoading(true);
-    setTimeout(() => {
-      onLogin({ id: 'google-user-123', email: 'user@gmail.com' }, 'google');
-      setLoading(false);
-    }, 1500);
   };
 
   return (
@@ -191,26 +181,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
         ) : (
           <div className="space-y-8">
-            {view === 'LOGIN' && (
-              <div className="space-y-4">
-                <button
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 px-6 py-5 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-2xl border border-slate-200 transition-all active:scale-[0.98] shadow-sm group"
-                >
-                  <Globe className="text-indigo-500 group-hover:rotate-12 transition-transform" size={20} />
-                  <span>Continue with Google</span>
-                </button>
-
-                <div className="relative py-4">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-                  <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-black text-slate-300">
-                    <span className="bg-white/80 px-6 rounded-full backdrop-blur-sm">or secure email</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <form onSubmit={view === 'LOGIN' ? handleLogin : view === 'SIGNUP' ? handleSignup : handleForgot} className="space-y-5">
               <div className="space-y-2 relative">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex justify-between items-center">
@@ -339,7 +309,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <div className="mt-12 pt-8 border-t border-slate-100/50 text-center">
           <div className="inline-flex items-center gap-3 text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">
-            <Fingerprint size={16} className="text-indigo-200" /> AES-256 Local Encryption
+            <Fingerprint size={16} className="text-indigo-200" /> PBKDF2 (100k) & HMAC Integrity
           </div>
         </div>
       </div>

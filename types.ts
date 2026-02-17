@@ -69,6 +69,8 @@ export interface FinancialReport {
 
 export interface AppSettings {
   isMLPredictionsEnabled: boolean;
+  isAIFeaturesEnabled: boolean;
+  hasAcceptedAIDisclosure: boolean;
   currency: string;
   monthlyBudget: number;
 }
@@ -77,7 +79,7 @@ export interface User {
   id: string;
   email: string;
   name?: string;
-  authProvider: 'local' | 'google';
+  authProvider: 'local';
 }
 
 export interface AuthState {

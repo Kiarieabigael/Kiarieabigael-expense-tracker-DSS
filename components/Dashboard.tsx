@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { TrendingUp, CreditCard, Wallet, AlertCircle, ArrowRight, ArrowUpCircle } from 'lucide-react';
+import { TrendingUp, CreditCard, Wallet, AlertCircle, ArrowRight, ArrowUpCircle, Sparkles, Shield } from 'lucide-react';
 import { Expense, Income, AppSettings, Category } from '../types';
 import { CATEGORY_COLORS } from '../constants';
 import { Link } from 'react-router-dom';
@@ -100,14 +100,28 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, incomes, settings }) =>
       </div>
 
       {/* Analysis Banner */}
-      <div className="bg-indigo-600 rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-100">
-        <div className="space-y-1">
-          <h3 className="text-xl font-bold">Your Financial DSS is ready.</h3>
-          <p className="text-indigo-100 text-sm">Based on your {settings.currency} {surplus.toLocaleString()} surplus, we have investment advice for you.</p>
-        </div>
-        <Link to="/budget" className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors shadow-lg">
-          View Advisory
-        </Link>
+      <div className={`${settings.isAIFeaturesEnabled ? 'bg-indigo-600' : 'bg-slate-800'} rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-indigo-100`}>
+        {settings.isAIFeaturesEnabled ? (
+          <>
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold">Your Financial DSS is ready.</h3>
+              <p className="text-indigo-100 text-sm">Based on your {settings.currency} {surplus.toLocaleString()} surplus, we have investment advice for you.</p>
+            </div>
+            <Link to="/budget" className="bg-white text-indigo-600 px-6 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors shadow-lg flex items-center gap-2">
+              <Sparkles size={18} /> View Advisory
+            </Link>
+          </>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold">Privacy-First Mode Active</h3>
+              <p className="text-slate-400 text-sm">AI analysis is disabled. Your data stays 100% offline.</p>
+            </div>
+            <Link to="/settings" className="bg-white/10 text-white px-6 py-3 rounded-xl font-bold hover:bg-white/20 transition-colors flex items-center gap-2 border border-white/20">
+              <Shield size={18} /> Manage AI
+            </Link>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
